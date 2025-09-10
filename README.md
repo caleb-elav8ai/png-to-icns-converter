@@ -100,7 +100,7 @@ The application generates ICNS files with the following Apple-standard icon size
 
 ```
 RCCP1/
-├── icns-converter.html    # Main application file (all-in-one)
+├── index.html    # Main application file (all-in-one)
 ├── README.md             # This documentation
 └── .git/                 # Git repository files
 ```
