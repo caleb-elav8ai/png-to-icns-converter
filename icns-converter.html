@@ -352,6 +352,48 @@
             display: block;
         }
 
+        .png-viewer {
+            background: #f8f9fa;
+            border: 2px dashed #0092D1;
+            border-radius: 15px;
+            padding: 30px;
+            margin-bottom: 30px;
+            text-align: center;
+            transition: all 0.3s ease;
+            cursor: pointer;
+        }
+
+        .png-viewer:hover {
+            border-color: #00FFF7;
+            background: #e8f4fd;
+        }
+
+        .png-viewer.dragover {
+            border-color: #00FFF7;
+            background: #e8f4fd;
+            transform: scale(1.02);
+        }
+
+        .png-viewer h3 {
+            font-family: 'Gilroy', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            color: #0092D1;
+            margin-bottom: 10px;
+            font-weight: 600;
+            font-size: 1.3rem;
+        }
+
+        .png-viewer p {
+            color: #666;
+            font-size: 1rem;
+            margin-bottom: 15px;
+        }
+
+        .png-viewer-icon {
+            font-size: 3rem;
+            margin-bottom: 15px;
+            display: block;
+        }
+
         .requirements {
             background: #e8f4fd;
             border: 1px solid #0092D1;
@@ -583,13 +625,6 @@
         </div>
 
         <div class="main-content">
-            <div class="icns-viewer" id="icnsViewer">
-                <span class="icns-viewer-icon">📁</span>
-                <h3>ICNS Viewer</h3>
-                <p>Drop your ICNS file here to view</p>
-                <input type="file" id="icnsFileInput" accept=".icns" style="display: none;">
-            </div>
-
             <div class="requirements">
                 <h3>📋 Requirements</h3>
                 <ul>
@@ -600,12 +635,19 @@
                 </ul>
             </div>
 
+            <div class="icns-viewer" id="icnsViewer">
+                <span class="icns-viewer-icon">📁</span>
+                <h3>ICNS Viewer</h3>
+                <p>Drop your ICNS file here to view</p>
+                <input type="file" id="icnsFileInput" accept=".icns" style="display: none;">
+            </div>
+
             <div class="upload-section">
-                <div class="file-input-wrapper">
-                    <input type="file" id="fileInput" class="file-input" accept=".png" />
-                    <label for="fileInput" class="file-input-label">
-                        📁 Choose PNG File (1024×1024)
-                    </label>
+                <div class="png-viewer" id="pngViewer">
+                    <span class="png-viewer-icon">📁</span>
+                    <h3>PNG File Upload</h3>
+                    <p>Drop your PNG file here to convert</p>
+                    <input type="file" id="fileInput" accept=".png" style="display: none;">
                 </div>
                 <div id="fileInfo" class="file-info">
                     <strong>Selected file:</strong> <span id="fileName"></span><br>
@@ -741,6 +783,7 @@
         const outputFileName = document.getElementById('outputFileName');
         const icnsViewer = document.getElementById('icnsViewer');
         const icnsFileInput = document.getElementById('icnsFileInput');
+        const pngViewer = document.getElementById('pngViewer');
         const previewModal = document.getElementById('previewModal');
         const modalImage = document.getElementById('modalImage');
         const modalTitle = document.getElementById('modalTitle');
@@ -782,9 +825,6 @@
         // Initialize on page load
         initializeApp();
 
-        // File input handler
-        fileInput.addEventListener('change', handleFileSelect);
-
         // ICNS viewer handlers
         icnsViewer.addEventListener('click', () => icnsFileInput.click());
         icnsFileInput.addEventListener('change', handleICNSFileSelect);
@@ -793,6 +833,15 @@
         icnsViewer.addEventListener('dragover', handleDragOver);
         icnsViewer.addEventListener('dragleave', handleDragLeave);
         icnsViewer.addEventListener('drop', handleICNSDrop);
+
+        // PNG viewer handlers
+        pngViewer.addEventListener('click', () => fileInput.click());
+        fileInput.addEventListener('change', handleFileSelect);
+
+        // Drag and drop handlers for PNG viewer
+        pngViewer.addEventListener('dragover', handlePNGDragOver);
+        pngViewer.addEventListener('dragleave', handlePNGDragLeave);
+        pngViewer.addEventListener('drop', handlePNGDrop);
 
         // Modal handlers
         modalClose.addEventListener('click', closeModal);
@@ -824,46 +873,9 @@
 
         function handleFileSelect(event) {
             const file = event.target.files[0];
-            if (!file) return;
-
-            // Validate file type
-            if (file.type !== 'image/png') {
-                showStatus('Please select a PNG file.', 'error');
-                return;
+            if (file) {
+                handlePNGFile(file);
             }
-
-            // Reset everything first (like a fresh start)
-            resetApplication();
-
-            // Store original filename for ICNS export
-            originalFileName = file.name.replace('.png', '').replace('.PNG', '');
-            
-            // Show file info
-            fileName.textContent = file.name;
-            fileSize.textContent = formatFileSize(file.size);
-            fileInfo.style.display = 'block';
-
-            // Load and validate image
-            const reader = new FileReader();
-            reader.onload = function(e) {
-                const img = new Image();
-                img.onload = function() {
-                    if (img.width !== 1024 || img.height !== 1024) {
-                        showStatus('Image must be exactly 1024×1024 pixels. Current size: ' + img.width + '×' + img.height, 'error');
-                        return;
-                    }
-
-                    originalImage = img;
-                    fileDimensions.textContent = img.width + '×' + img.height;
-                    outputFileName.textContent = `${originalFileName}.icns`;
-                    generatePreviews();
-                    convertBtn.disabled = false;
-                    resetBtn.style.display = 'inline-block';
-                    showStatus('Image loaded successfully! Ready to convert.', 'success');
-                };
-                img.src = e.target.result;
-            };
-            reader.readAsDataURL(file);
         }
 
         function generatePreviews() {
@@ -1081,17 +1093,17 @@
         }
 
         function getOSType(size) {
-            // Custom OSType codes for Elevate logo with logical size-based naming
+            // Standard Apple OSType codes for ICNS files
             const ostypes = {
-                16: [0x45, 0x4c, 0x31, 0x36], // 'EL16' - 16x16
-                32: [0x45, 0x4c, 0x33, 0x32], // 'EL32' - 32x32
-                48: [0x45, 0x4c, 0x34, 0x38], // 'EL48' - 48x48
-                128: [0x45, 0x4c, 0x31, 0x32], // 'EL12' - 128x128 (using 12 for 128)
-                256: [0x45, 0x4c, 0x32, 0x35], // 'EL25' - 256x256 (using 25 for 256)
-                512: [0x45, 0x4c, 0x35, 0x31], // 'EL51' - 512x512 (using 51 for 512)
-                1024: [0x45, 0x4c, 0x31, 0x30] // 'EL10' - 1024x1024 (using 10 for 1024)
+                16: [0x69, 0x63, 0x30, 0x37], // 'ic07' - 16x16
+                32: [0x69, 0x63, 0x30, 0x38], // 'ic08' - 32x32
+                48: [0x69, 0x63, 0x30, 0x39], // 'ic09' - 48x48
+                128: [0x69, 0x63, 0x31, 0x30], // 'ic10' - 128x128
+                256: [0x69, 0x63, 0x31, 0x31], // 'ic11' - 256x256
+                512: [0x69, 0x63, 0x31, 0x32], // 'ic12' - 512x512
+                1024: [0x69, 0x63, 0x31, 0x33] // 'ic13' - 1024x1024
             };
-            return ostypes[size] || [0x45, 0x4c, 0x31, 0x36]; // Default to EL16
+            return ostypes[size] || [0x69, 0x63, 0x30, 0x37]; // Default to ic07
         }
 
         function showStatus(message, type) {
@@ -1207,6 +1219,67 @@
             if (files.length > 0) {
                 handleICNSFile(files[0]);
             }
+        }
+
+        // PNG drag and drop handlers
+        function handlePNGDragOver(e) {
+            e.preventDefault();
+            pngViewer.classList.add('dragover');
+        }
+
+        function handlePNGDragLeave(e) {
+            e.preventDefault();
+            pngViewer.classList.remove('dragover');
+        }
+
+        function handlePNGDrop(e) {
+            e.preventDefault();
+            pngViewer.classList.remove('dragover');
+            
+            const files = e.dataTransfer.files;
+            if (files.length > 0) {
+                handlePNGFile(files[0]);
+            }
+        }
+
+        function handlePNGFile(file) {
+            if (!file.name.toLowerCase().endsWith('.png')) {
+                showStatus('Please select a valid PNG file.', 'error');
+                return;
+            }
+
+            // Reset everything first (like a fresh start)
+            resetApplication();
+
+            // Store original filename for ICNS export
+            originalFileName = file.name.replace('.png', '').replace('.PNG', '');
+            
+            // Show file info
+            fileName.textContent = file.name;
+            fileSize.textContent = formatFileSize(file.size);
+            fileInfo.style.display = 'block';
+
+            // Load and validate image
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                const img = new Image();
+                img.onload = function() {
+                    if (img.width !== 1024 || img.height !== 1024) {
+                        showStatus('Image must be exactly 1024×1024 pixels. Current size: ' + img.width + '×' + img.height, 'error');
+                        return;
+                    }
+
+                    originalImage = img;
+                    fileDimensions.textContent = img.width + '×' + img.height;
+                    outputFileName.textContent = `${originalFileName}.icns`;
+                    generatePreviews();
+                    convertBtn.disabled = false;
+                    resetBtn.style.display = 'inline-block';
+                    showStatus('Image loaded successfully! Ready to convert.', 'success');
+                };
+                img.src = e.target.result;
+            };
+            reader.readAsDataURL(file);
         }
 
         function handleICNSFileSelect(event) {
@@ -1363,17 +1436,15 @@
                 'icn6': 64, 'icn7': 128, 'icn8': 256,
                 'icn9': 512, 'icna': 1024,
                 
-                // Custom OSType codes (from your generated ICNS files)
-                'EL16': 16, 'EL32': 32, 'EL48': 48,
-                'EL12': 128, 'EL25': 256, 'EL51': 512,
-                'EL10': 1024,
+                // Standard Apple OSType codes
+                'ic07': 16, 'ic08': 32, 'ic09': 48,
+                'ic10': 128, 'ic11': 256, 'ic12': 512,
+                'ic13': 1024,
                 
-                // Additional EL codes for all possible sizes
-                'EL01': 16, 'EL02': 32, 'EL03': 48, 'EL04': 64,
-                'EL05': 128, 'EL06': 256, 'EL07': 512, 'EL08': 1024,
-                'EL09': 2048, 'EL11': 16, 'EL13': 32, 'EL14': 48,
-                'EL15': 64, 'EL17': 128, 'EL18': 256, 'EL19': 512,
-                'EL20': 1024, 'EL21': 2048, 'EL22': 4096
+                // Additional standard Apple codes for other sizes
+                'ic04': 16, 'ic05': 32, 'ic06': 64,
+                'ic14': 32, 'ic15': 64, 'ic16': 256,
+                'ic17': 512, 'ic18': 1024
             };
             
             console.log('Checking OSType:', ostype, 'Size:', sizeMap[ostype] || 0);
