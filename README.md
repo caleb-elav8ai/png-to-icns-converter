@@ -1,4 +1,4 @@
-# 🍎 PNG to ICNS Converter & Image Resizer
+# 🖼 PNG to ICNS Converter & Image Resizer
 
 A modern, all-in-one HTML application that converts PNG images into Apple ICNS files and includes a built-in image resizer. Perfect for developers, designers, and anyone who needs to create Apple-compatible icon files.
 
